@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from models.database_models import Debate, MPResponse, Vote
+from models.database_models import Debate, MPResponse, Vote, PolicyPaper
 from models.schemas import DebateCreate
 
 class DebateRepository:
@@ -89,3 +89,27 @@ class DebateRepository:
     @staticmethod
     async def get_debate_votes(db: Session, debate_id: int) -> List[Vote]:
         return db.query(Vote).filter(Vote.debate_id == debate_id).all()
+
+    @staticmethod
+    async def create_debate_from_paper(db: Session, paper: PolicyPaper, debate_data: dict) -> Debate:
+        """Create a new debate from a policy paper."""
+        try:
+            db_debate = Debate(
+                title=debate_data["debate_topic"],
+                description=debate_data["background"],
+                policy_text=paper.content,
+                status="active"
+            )
+            db.add(db_debate)
+            db.commit()
+            db.refresh(db_debate)
+            
+            # Update paper with debate reference
+            paper.debate_id = db_debate.id
+            paper.status = "debated"
+            db.commit()
+            
+            return db_debate
+        except Exception as e:
+            db.rollback()
+            raise Exception(f"Failed to create debate: {str(e)}")

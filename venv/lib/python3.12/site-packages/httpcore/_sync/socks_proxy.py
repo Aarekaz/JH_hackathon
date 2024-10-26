@@ -216,7 +216,6 @@ class Socks5Connection(ConnectionInterface):
 
     def handle_request(self, request: Request) -> Response:
         timeouts = request.extensions.get("timeout", {})
-        sni_hostname = request.extensions.get("sni_hostname", None)
         timeout = timeouts.get("connect", None)
 
         with self._connect_lock:
@@ -259,8 +258,7 @@ class Socks5Connection(ConnectionInterface):
 
                         kwargs = {
                             "ssl_context": ssl_context,
-                            "server_hostname": sni_hostname
-                            or self._remote_origin.host.decode("ascii"),
+                            "server_hostname": self._remote_origin.host.decode("ascii"),
                             "timeout": timeout,
                         }
                         with Trace("start_tls", logger, request, kwargs) as trace:

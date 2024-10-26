@@ -6,4 +6,5 @@ uvicorn
 psycopg2-binary>=2.9.0  # for PostgreSQL
 alembic>=1.7.0  # for database migrations
 requests
-
+arxiv
+httpx==0.24.1  # for ArXiv API

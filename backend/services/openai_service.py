@@ -1,8 +1,9 @@
+import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
-from models.database_models import MPResponse
+from models.database_models import MPResponse, PolicyPaper
 from openai import OpenAI
 
 
@@ -170,3 +171,43 @@ Format your response exactly as shown:
                 status_code=500,
                 detail=f"Error generating vote decision: {str(e)}"
             )
+
+    async def create_debate_from_paper(self, paper: PolicyPaper) -> dict:
+        """Create a structured debate from a policy paper."""
+        try:
+            prompt = f"""Based on this AI research paper, create a debate topic:
+Title: {paper.title}
+Summary: {paper.summary}
+
+Create a debate topic that MPs can discuss regarding AI policy implications."""
+
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a parliamentary debate moderator."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=300
+            )
+            
+            # Always return a structured response, even if OpenAI fails
+            try:
+                content = response.choices[0].message.content
+            except:
+                content = paper.title
+
+            return {
+                "debate_topic": content,
+                "background": paper.summary,
+                "key_considerations": ["Safety", "Ethics", "Implementation"]
+            }
+            
+        except Exception as e:
+            print(f"OpenAI Error: {str(e)}")
+            # Return a fallback response instead of raising an error
+            return {
+                "debate_topic": f"Policy Implications of: {paper.title}",
+                "background": paper.summary,
+                "key_considerations": ["Safety", "Ethics", "Implementation"]
+            }

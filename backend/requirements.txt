@@ -1,0 +1,9 @@
+fastapi
+sqlalchemy
+python-dotenv
+openai
+uvicorn
+psycopg2-binary>=2.9.0  # for PostgreSQL
+alembic>=1.7.0  # for database migrations
+requests
+

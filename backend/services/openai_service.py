@@ -1,18 +1,114 @@
-from typing import List, Dict
-import openai
 from datetime import datetime
+from typing import Dict, List, Optional
+
+from fastapi import HTTPException
+from models.database_models import MPResponse
+from openai import OpenAI
+
 
 class OpenAIService:
-    def __init__(self, api_key: str):
-        """Initialize OpenAI service with API key."""
-        self.client = openai.Client(api_key=api_key)
+    """Service for handling OpenAI API interactions."""
     
+    def __init__(self, api_key: str = None):
+        """Initialize OpenAI client with API key."""
+        if not api_key:
+            raise ValueError("OpenAI API key is required")
+        
+        self.client = OpenAI(api_key=api_key)
+        
+        self.mp_roles = {
+            "corporate": {
+                "description": "Represents business interests, focuses on innovation and economic growth",
+                "bias": "Favors minimal regulation and market-driven solutions"
+            },
+            "government": {
+                "description": "Represents state interests, focuses on governance and public safety",
+                "bias": "Seeks balance between innovation and regulation"
+            },
+            "academic": {
+                "description": "Represents research community, focuses on scientific evidence and ethics",
+                "bias": "Emphasizes careful consideration of long-term implications"
+            },
+            "civil_rights": {
+                "description": "Represents public interests, focuses on individual rights and fairness",
+                "bias": "Advocates for transparency and protection of civil liberties"
+            }
+        }
+
     async def generate_mp_response(
         self, 
         role: str, 
-        context: str, 
-        debate_history: List[Dict]
+        debate_topic: str, 
+        debate_history: List[MPResponse]
     ) -> str:
-        """Generate MP response based on role and context."""
-        # ... implementation details
+        """Generate an MP's response based on their role and debate context."""
+        try:
+            # Format debate history for context
+            formatted_history = "\n".join([
+                f"{response.mp_role}: {response.content}" 
+                for response in debate_history
+            ])
+            
+            # Construct the prompt
+            prompt = f"""You are an AI Member of Parliament representing {role} interests.
+Role Description: {self.mp_roles[role]['description']}
+Bias: {self.mp_roles[role]['bias']}
 
+Debate Topic: {debate_topic}
+
+Previous Discussion:
+{formatted_history}
+
+Please provide your response to the current debate, considering your role's perspective:"""
+
+            # The OpenAI client is not async, so we don't use await here
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an AI MP in a parliamentary debate."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            return response.choices[0].message.content
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating MP response: {str(e)}"
+            )
+
+    async def evaluate_policy(self, policy_text: str) -> Dict:
+        """Evaluate a proposed policy from multiple perspectives."""
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an AI policy analyst."},
+                    {"role": "user", "content": f"""Analyze this AI policy proposal from multiple perspectives:
+
+Policy Text:
+{policy_text}
+
+Please provide:
+1. Potential benefits
+2. Potential risks
+3. Implementation challenges
+4. Stakeholder impacts"""}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+            
+            return {
+                "analysis": response.choices[0].message.content,
+                "timestamp": datetime.utcnow()
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error evaluating policy: {str(e)}"
+            )

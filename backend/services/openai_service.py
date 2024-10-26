@@ -112,3 +112,61 @@ Please provide:
                 status_code=500,
                 detail=f"Error evaluating policy: {str(e)}"
             )
+
+    async def generate_vote_decision(
+        self, 
+        role: str, 
+        debate_topic: str, 
+        debate_history: List[MPResponse]
+    ) -> dict:
+        """Generate MP's voting decision based on the debate."""
+        try:
+            # Format debate history
+            formatted_history = "\n".join([
+                f"{response.mp_role}: {response.content[:200]}..." 
+                for response in debate_history
+            ])
+            
+            prompt = f"""As an AI MP representing {role} interests, analyze this debate and vote:
+Topic: {debate_topic}
+
+Key Points from Debate:
+{formatted_history}
+
+Based on your role's perspective and the debate, provide your vote and reasoning.
+Format your response exactly as shown:
+{{
+    "vote": "for",  // must be exactly "for", "against", or "abstain"
+    "reasoning": "Brief explanation of your vote"
+}}"""
+
+            response = self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an AI MP making a voting decision. Respond only with the exact JSON format specified."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=200  # Limit response length
+            )
+            
+            # Parse and validate response
+            import json
+            vote_data = json.loads(response.choices[0].message.content)
+            
+            # Validate vote value
+            if vote_data["vote"] not in ["for", "against", "abstain"]:
+                raise ValueError(f"Invalid vote value: {vote_data['vote']}")
+                
+            return vote_data
+
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error parsing vote decision: {str(e)}"
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error generating vote decision: {str(e)}"
+            )

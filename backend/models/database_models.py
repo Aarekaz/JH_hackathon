@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Foreign
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.database import Base
+from sqlalchemy.sql import func
 
 class Debate(Base):
     """Database model for debates."""
@@ -34,13 +35,13 @@ class MPResponse(Base):
 class Vote(Base):
     """Database model for votes."""
     __tablename__ = "votes"
-
+    
     id = Column(Integer, primary_key=True, index=True)
     debate_id = Column(Integer, ForeignKey("debates.id"))
     mp_role = Column(String)
-    vote = Column(Boolean)
+    vote = Column(String)  # 'for', 'against', 'abstain'
     reasoning = Column(Text)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationship
     debate = relationship("Debate", back_populates="votes")

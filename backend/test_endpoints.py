@@ -1,7 +1,9 @@
-import requests
 import json
 import os
 from datetime import datetime
+import asyncio
+
+import requests
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -9,7 +11,7 @@ load_dotenv()
 
 BASE_URL = "http://localhost:8000"
 
-def test_endpoints():
+async def test_endpoints():
     # 1. Create a debate
     debate_data = {
         "title": "AI Safety Regulations",
@@ -51,7 +53,30 @@ def test_endpoints():
     response = requests.get(f"{BASE_URL}/debates/{debate_id}/responses")
     print("\n4. All Debate Responses:", response.json())
 
+    # Test voting
+    print("\nTesting Voting Process:")
+    for role in ["corporate", "academic", "government", "civil_rights"]:
+        try:
+            response = requests.post(
+                f"{BASE_URL}/debates/{debate_id}/votes",
+                params={"mp_role": role}
+            )
+            response.raise_for_status()  # Raise exception for bad status codes
+            vote_data = response.json()
+            print(f"\n{role.capitalize()} Vote:")
+            print(f"Decision: {vote_data['vote']}")
+            print(f"Reasoning: {vote_data['reasoning']}")
+        except Exception as e:
+            print(f"Error getting {role} vote:", str(e))
+
+    # Get vote summary
+    try:
+        response = requests.get(f"{BASE_URL}/debates/{debate_id}/vote-summary")
+        response.raise_for_status()
+        print("\nVote Summary:", response.json())
+    except Exception as e:
+        print("Error getting vote summary:", str(e))
+
 if __name__ == "__main__":
-    if not os.getenv("OPENAI_API_KEY"):
-        print("\nWarning: OPENAI_API_KEY not set. Running with test responses.")
-    test_endpoints()
+    import asyncio
+    asyncio.run(test_endpoints())

@@ -70,11 +70,86 @@ async def get_debate_responses(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/{debate_id}/votes", response_model=Vote)
-async def submit_vote(debate_id: int, vote: Vote):
-    """Submit an MP's vote on a debate."""
+@router.post("/{debate_id}/votes", response_model=dict)
+async def cast_vote(
+    debate_id: int,
+    mp_role: str,
+    db: Session = Depends(get_db),
+    openai_service: OpenAIService = Depends(get_openai_service)
+):
+    """Cast a vote for a specific MP role."""
     try:
-        # Implementation for vote submission
-        return vote
+        # Get debate details and history
+        debate = await DebateRepository.get_debate(db, debate_id)
+        if not debate:
+            raise HTTPException(status_code=404, detail="Debate not found")
+            
+        debate_history = await DebateRepository.get_debate_responses(db, debate_id)
+        
+        # Generate vote decision
+        vote_decision = await openai_service.generate_vote_decision(
+            mp_role,
+            debate.title,
+            debate_history
+        )
+        
+        # Store vote in database
+        db_vote = await DebateRepository.create_vote(
+            db,
+            debate_id=debate_id,
+            mp_role=mp_role,
+            vote=vote_decision["vote"],
+            reasoning=vote_decision["reasoning"]
+        )
+        
+        return {
+            "status": "success",
+            "vote": db_vote.vote,
+            "reasoning": db_vote.reasoning,
+            "mp_role": db_vote.mp_role,
+            "debate_id": db_vote.debate_id,
+            "timestamp": db_vote.timestamp
+        }
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error casting vote: {str(e)}"
+        )
+
+@router.get("/{debate_id}/votes", response_model=List[Vote])
+async def get_votes(
+    debate_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get all votes for a debate."""
+    return await DebateRepository.get_debate_votes(db, debate_id)
+
+@router.get("/{debate_id}/vote-summary")
+async def get_vote_summary(
+    debate_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a summary of the voting results."""
+    votes = await DebateRepository.get_debate_votes(db, debate_id)
+    
+    summary = {
+        "for": 0,
+        "against": 0,
+        "abstain": 0,
+        "total": len(votes),
+        "result": None
+    }
+    
+    for vote in votes:
+        summary[vote.vote] += 1
+    
+    # Determine result
+    if summary["for"] > summary["against"]:
+        summary["result"] = "passed"
+    elif summary["for"] < summary["against"]:
+        summary["result"] = "rejected"
+    else:
+        summary["result"] = "tied"
+    
+    return summary

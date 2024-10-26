@@ -66,3 +66,26 @@ class DebateRepository:
     async def get_debate_responses(db: Session, debate_id: int) -> List[MPResponse]:
         """Get all responses for a debate."""
         return db.query(MPResponse).filter(MPResponse.debate_id == debate_id).all()
+
+    @staticmethod
+    async def create_vote(
+        db: Session, 
+        debate_id: int, 
+        mp_role: str, 
+        vote: str,
+        reasoning: str
+    ) -> Vote:
+        db_vote = Vote(
+            debate_id=debate_id,
+            mp_role=mp_role,
+            vote=vote,
+            reasoning=reasoning
+        )
+        db.add(db_vote)
+        db.commit()
+        db.refresh(db_vote)
+        return db_vote
+
+    @staticmethod
+    async def get_debate_votes(db: Session, debate_id: int) -> List[Vote]:
+        return db.query(Vote).filter(Vote.debate_id == debate_id).all()

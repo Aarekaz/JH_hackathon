@@ -1,10 +1,16 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Highcharts from "highcharts";
 import HighchartsItem from "highcharts/modules/item-series";
-
+import axios from "axios";
 // Initialize the item module
 HighchartsItem(Highcharts);
 const LeftChart = () => {
+  const debate_id = localStorage.getItem("debate_id");
+  const [votesFor, setVotesFor] = useState(0);
+  const [votesAgainst, setVotesAgainst] = useState(0);
+  const [votesAbstain, setVotesAbstain] = useState(0);
+  const [votesResult, setVotesResult] = useState("");
+
   useEffect(() => {
     Highcharts.chart("container", {
       chart: {
@@ -83,10 +89,43 @@ const LeftChart = () => {
       },
     });
   }, []);
-
+  useEffect(() => {
+    if (debate_id) {
+      axios
+        .get(`http://localhost:8000/debates/17/vote-summary`)
+        .then((response) => {
+          console.log(response.data);
+          setVotesFor(response.data.for);
+          setVotesAgainst(response.data.against);
+          setVotesAbstain(response.data.abstain);
+          setVotesResult(response.data.result);
+        });
+    }
+  }, [debate_id]);
   return (
-    <div className="h-full">
+    <div className="h-full flex flex-col items-center justify-center">
       <div id="container" style={{ width: "100%", height: "50%" }}></div>
+      <div className="votes bg-white shadow-md rounded-lg p-6 mt-6 w-full max-w-2xl">
+        <h2 className="text-2xl font-bold mb-4 text-center">Votes Summary</h2>
+        <div className="flex justify-around gap-4">
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">For</h3>
+            <p className="text-xl">{votesFor}</p>
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">Against</h3>
+            <p className="text-xl">{votesAgainst}</p>
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">Abstain</h3>
+            <p className="text-xl">{votesAbstain}</p>
+          </div>
+          <div className="text-center">
+            <h3 className="text-lg font-semibold">Result</h3>
+            <p className="text-xl">{votesResult}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

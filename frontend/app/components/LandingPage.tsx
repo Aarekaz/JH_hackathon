@@ -34,7 +34,7 @@ const LandingPage: React.FC = () => {
       console.log(data);
       setPapers(data);
     });
-  }, []); // Empty dependency array to run only once on mount
+  }, []); 
 
   const handleStartDebate = (paper: any) => {
     localStorage.setItem("paperid", paper.id);

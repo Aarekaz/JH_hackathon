@@ -6,63 +6,35 @@ import {
   faUniversity,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
+import axios from "axios";
 
-const RightChat = ({ paperid }) => {
+const RightChat = () => {
   const [messages, setMessages] = useState([]);
+  const paper_id = localStorage.getItem("paperid");
   const [displayedMessages, setDisplayedMessages] = useState([]);
-  const [debateMessages, setDebateMessages] = useState([]);
-
-  // useEffect(() => {
-  //   if (paperid) {
-  //     // Fetch debate messages based on paperid
-  //     fetch(`/api/debate/${paperid}`)
-  //       .then((response) => response.json())
-  //       .then((response) => {
-  //         setDebateMessages(response.data);
-  //       });
-  //   }
-  // }, [paperid]);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(true);
 
   useEffect(() => {
-    const initialMessages = [
-      {
-        id: 1,
-        representative: "Corporations",
-        message: "We need to prioritize innovation and minimal regulations",
-        color: "#DA0211",
-      },
-      {
-        id: 2,
-        representative: "Government",
-        message:
-          "We need to seek a balance between innovation and public safety",
-        color: "#2CAFFE",
-      },
-      {
-        id: 3,
-        representative: "Academics",
-        message:
-          "We need to focus on long-term risks, ethical implications, and AI safety",
-        color: "#FDA003",
-      },
-      {
-        id: 4,
-        representative: "Civil Rights Advocates",
-        message:
-          "We need to champion fairness, transparency, and social impact",
-        color: "#000099",
-      },
-      {
-        id: 5,
-        representative: "Academics",
-        message: "We need to ensure that AI benefits all of society",
-        color: "#FDA003",
-      },
-    ];
-    setMessages(initialMessages);
-  }, []);
+    const fetchMessages = async () => {
+      try {
+        const response = await axios.post(
+          `
+http://localhost:8000/debates/${paper_id}/start-full-debate`
+        );
+        setMessages(response.data);
+        const debate_id = response.data.debate_id;
+        localStorage.setItem("debate_id", debate_id);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+
+    fetchMessages();
+  }, [paper_id]);
 
   useEffect(() => {
+    if (messages.length === 0) return;
+
     let index = 0;
     const interval = setInterval(() => {
       if (index < messages.length) {
@@ -70,15 +42,12 @@ const RightChat = ({ paperid }) => {
         index++;
       } else {
         clearInterval(interval);
+        setIsButtonDisabled(false); // Enable the button after all messages are displayed
       }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [messages]);
-
-  const handleVote = () => {
-    console.log("Voting...");
-  };
 
   const getIcon = (representative) => {
     switch (representative) {
@@ -94,8 +63,6 @@ const RightChat = ({ paperid }) => {
         return faUsers;
     }
   };
-
-  console.log("displayMessages", displayedMessages);
 
   return (
     <div className="flex flex-col h-full p-4 border-l border-gray-300 bg-gray-400">
@@ -126,7 +93,7 @@ const RightChat = ({ paperid }) => {
       </div>
       <div className="flex w-full p-4">
         <button
-          onClick={handleVote}
+          disabled={isButtonDisabled}
           className="w-full p-2 bg-purple-600 text-white rounded"
         >
           It's time to VOTE!

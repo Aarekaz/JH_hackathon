@@ -33,6 +33,7 @@ class MPResponse(Base):
     debate_id = Column(Integer, ForeignKey("debates.id"))
     mp_role = Column(String)
     content = Column(Text)
+    color = Column(String, default="#000000")
     timestamp = Column(DateTime, default=datetime.utcnow)
     
     # Relationship

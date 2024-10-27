@@ -179,6 +179,9 @@ async def start_full_debate(
         response_dicts = []  # Store dictionary representations
         
         for role in mp_roles:
+            # Get MP color from OpenAI service
+            mp_color = openai_service.mp_roles[role]["color"]
+            
             content = await openai_service.generate_mp_response(
                 role,
                 debate.title,
@@ -189,7 +192,8 @@ async def start_full_debate(
                 db,
                 debate.id,
                 role,
-                content
+                content,
+                mp_color
             )
             db_responses.append(db_response)
             
@@ -199,6 +203,7 @@ async def start_full_debate(
                 "debate_id": db_response.debate_id,
                 "mp_role": db_response.mp_role,
                 "content": db_response.content,
+                "color": db_response.color,
                 "timestamp": db_response.timestamp
             })
         

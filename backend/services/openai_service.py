@@ -19,20 +19,24 @@ class OpenAIService:
         
         self.mp_roles = {
             "corporate": {
-                "description": "Represents business interests, focuses on innovation and economic growth",
-                "bias": "Favors minimal regulation and market-driven solutions"
-            },
-            "government": {
-                "description": "Represents state interests, focuses on governance and public safety",
-                "bias": "Seeks balance between innovation and regulation"
+                "description": "Represents business and industry interests",
+                "bias": "Favors market-driven solutions and minimal regulation",
+                "color": "#0066CC"  # Business blue
             },
             "academic": {
-                "description": "Represents research community, focuses on scientific evidence and ethics",
-                "bias": "Emphasizes careful consideration of long-term implications"
+                "description": "Represents academic and research institutions",
+                "bias": "Favors evidence-based policy and thorough research",
+                "color": "#9933CC"  # Academic purple
+            },
+            "government": {
+                "description": "Represents governmental and regulatory interests",
+                "bias": "Favors structured oversight and public safety",
+                "color": "#006633"  # Government green
             },
             "civil_rights": {
-                "description": "Represents public interests, focuses on individual rights and fairness",
-                "bias": "Advocates for transparency and protection of civil liberties"
+                "description": "Represents civil society and individual rights",
+                "bias": "Favors privacy and individual protections",
+                "color": "#CC3333"  # Advocacy red
             }
         }
 

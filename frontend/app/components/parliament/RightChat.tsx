@@ -8,22 +8,19 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
 
-const RightChat = () => {
+const RightChat = ({ onVote }) => {
   const [messages, setMessages] = useState([]);
   const paper_id = localStorage.getItem("paperid");
-  const [displayedMessages, setDisplayedMessages] = useState([]);
-  const [isButtonDisabled, setIsButtonDisabled] = useState(true);
 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
         const response = await axios.post(
-          `
-http://localhost:8000/debates/${paper_id}/start-full-debate`
+          `http://localhost:8000/debates/${paper_id}/start-full-debate`
         );
-        setMessages(response.data);
-        const debate_id = response.data.debate_id;
-        localStorage.setItem("debate_id", debate_id);
+        setMessages(response.data.responses);
+        const summary = response.data.summary;
+        localStorage.setItem("summary", JSON.stringify(summary));
       } catch (error) {
         console.error("Error fetching messages:", error);
       }
@@ -32,42 +29,30 @@ http://localhost:8000/debates/${paper_id}/start-full-debate`
     fetchMessages();
   }, [paper_id]);
 
-  useEffect(() => {
-    if (messages.length === 0) return;
-
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < messages.length) {
-        setDisplayedMessages((prev) => [...prev, messages[index]]);
-        index++;
-      } else {
-        clearInterval(interval);
-        setIsButtonDisabled(false); // Enable the button after all messages are displayed
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [messages]);
-
   const getIcon = (representative) => {
     switch (representative) {
-      case "Corporations":
+      case "corporate":
         return faBuilding;
-      case "Government":
+      case "government":
         return faGavel;
-      case "Academics":
+      case "academic":
         return faUniversity;
-      case "Civil Rights Advocates":
+      case "civil_rights":
         return faUsers;
       default:
         return faUsers;
     }
   };
 
+  const handleVoteClick = () => {
+    const summary = JSON.parse(localStorage.getItem("summary") || "{}");
+    onVote(summary);
+  };
+
   return (
     <div className="flex flex-col h-full p-4 border-l border-gray-300 bg-gray-400">
       <div className="flex-1 overflow-y-auto mb-4">
-        {displayedMessages?.map((item, index) => (
+        {messages?.map((item, index) => (
           <div
             key={index}
             className={`flex items-end mb-4 ${
@@ -77,7 +62,7 @@ http://localhost:8000/debates/${paper_id}/start-full-debate`
             <div className="flex-shrink-0">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
                 <FontAwesomeIcon
-                  icon={getIcon(item.representative)}
+                  icon={getIcon(item.mp_role)}
                   className="text-blue-500"
                 />
               </div>
@@ -86,15 +71,15 @@ http://localhost:8000/debates/${paper_id}/start-full-debate`
               className={`ml-2 p-4 rounded-lg text-white`}
               style={{ backgroundColor: item.color }}
             >
-              <div>{item.message}</div>
+              <div>{item.content}</div>
             </div>
           </div>
         ))}
       </div>
       <div className="flex w-full p-4">
         <button
-          disabled={isButtonDisabled}
           className="w-full p-2 bg-purple-600 text-white rounded"
+          onClick={handleVoteClick}
         >
           It's time to VOTE!
         </button>

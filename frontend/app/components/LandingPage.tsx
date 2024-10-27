@@ -4,7 +4,9 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const LandingPage: React.FC = () => {
-  const [papers, setPapers] = useState<any[]>([]);
+  const [papers, setPapers] = useState<any[]>(
+    JSON.parse(localStorage.getItem("papers") || "[]")
+  );
   const navigate = useNavigate();
 
   // Function to fetch papers from the backend
@@ -33,8 +35,9 @@ const LandingPage: React.FC = () => {
     getArxivPapers().then((data) => {
       console.log(data);
       setPapers(data);
+      localStorage.setItem("papers", JSON.stringify(data));
     });
-  }, []); 
+  }, []);
 
   const handleStartDebate = (paper: any) => {
     localStorage.setItem("paperid", paper.id);

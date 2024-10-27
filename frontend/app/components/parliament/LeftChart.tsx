@@ -92,7 +92,7 @@ const LeftChart = () => {
   useEffect(() => {
     if (debate_id) {
       axios
-        .get(`http://localhost:8000/debates/17/vote-summary`)
+        .get(`http://localhost:8000/debates/${debate_id}/vote-summary`)
         .then((response) => {
           console.log(response.data);
           setVotesFor(response.data.for);
@@ -102,6 +102,7 @@ const LeftChart = () => {
         });
     }
   }, [debate_id]);
+  
   return (
     <div className="h-full flex flex-col items-center justify-center">
       <div id="container" style={{ width: "100%", height: "50%" }}></div>

@@ -29,13 +29,15 @@ class DebateRepository:
         db: Session, 
         debate_id: int, 
         mp_role: str, 
-        content: str
+        content: str,
+        color: str
     ) -> MPResponse:
-        """Add a new MP response to a debate."""
+        """Add a response to the debate."""
         db_response = MPResponse(
             debate_id=debate_id,
             mp_role=mp_role,
-            content=content
+            content=content,
+            color=color
         )
         db.add(db_response)
         db.commit()

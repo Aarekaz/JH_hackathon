@@ -21,22 +21,22 @@ class OpenAIService:
             "corporate": {
                 "description": "Represents business and industry interests",
                 "bias": "Favors market-driven solutions and minimal regulation",
-                "color": "#0066CC"  # Business blue
+                "color": "#DA0211"  # Business blue
             },
             "academic": {
                 "description": "Represents academic and research institutions",
                 "bias": "Favors evidence-based policy and thorough research",
-                "color": "#9933CC"  # Academic purple
+                "color": "#FDA003"  # Academic purple
             },
             "government": {
                 "description": "Represents governmental and regulatory interests",
                 "bias": "Favors structured oversight and public safety",
-                "color": "#006633"  # Government green
+                "color": "#2CAFFE"  # Government green
             },
             "civil_rights": {
                 "description": "Represents civil society and individual rights",
                 "bias": "Favors privacy and individual protections",
-                "color": "#CC3333"  # Advocacy red
+                "color": "#000099"  # Advocacy red
             }
         }
 

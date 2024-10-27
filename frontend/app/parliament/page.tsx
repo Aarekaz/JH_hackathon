@@ -1,20 +1,30 @@
 "use client";
-import React from "react";
-import { useLocation } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+
 import LeftChart from "../components/parliament/LeftChart";
 import RightChat from "../components/parliament/RightChat";
-
+import axios from "axios";
 const ParliamentPage: React.FC = () => {
-  const location = useLocation();
-  const paper = location.state?.paper;
+  const paperid = localStorage.getItem("paperid");
+  const [paperInfo, setPaperInfo] = useState<any>();
+
+  // if you get paperid, fetch paper info from this url /papers/{paper_id} using axios
+  useEffect(() => {
+    if (paperid) {
+      axios.get(`http://localhost:8000/papers/${paperid}`).then((response) => {
+        setPaperInfo(response.data);
+      });
+    }
+  }, [paperid]);
+  console.log("paper info", paperInfo);
 
   return (
     <div className="flex w-full h-screen">
       <div className="w-9/12 h-full">
-        {paper && (
+        {paperInfo && (
           <div className="p-4">
-            <h2 className="text-2xl font-bold mb-4">{paper.title}</h2>
-            <p>{paper.summary}</p>
+            <h2 className="text-2xl font-bold mb-4">{paperInfo.title}</h2>
+            <p>{paperInfo.summary}</p>
           </div>
         )}
         <LeftChart />
@@ -27,4 +37,3 @@ const ParliamentPage: React.FC = () => {
 };
 
 export default ParliamentPage;
-

@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 const RightChat = () => {
   const [messages, setMessages] = useState<string[]>([]);
   const [input, setInput] = useState<string>("");
+  const paperid = localStorage.getItem("paperid");
+  const [debateMessages, setDebateMessages] = useState<any>();
 
   const handleSendMessage = () => {
     if (input.trim()) {
@@ -10,6 +12,17 @@ const RightChat = () => {
       setInput("");
     }
   };
+
+  useEffect(() => {
+    if (paperid) {
+      axios
+        .post(`http://localhost:8000/papers/${paperid}/debate`)
+        .then((response) => {
+          setDebateMessages(response.data);
+        });
+    }
+  }, [paperid]);
+  console.log("debate info", debateMessages);
 
   return (
     <div className="flex flex-col h-full p-4 border-l border-gray-300">

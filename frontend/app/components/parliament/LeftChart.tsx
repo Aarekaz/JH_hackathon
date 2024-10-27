@@ -86,7 +86,7 @@ const LeftChart = () => {
 
   return (
     <div className="h-full">
-      <div id="container" style={{ width: "100%", height: "70%" }}></div>
+      <div id="container" style={{ width: "100%", height: "50%" }}></div>
     </div>
   );
 };

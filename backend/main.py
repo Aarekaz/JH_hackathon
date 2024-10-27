@@ -1,9 +1,14 @@
 import logging
+import os
+from dotenv import load_dotenv
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.init_db import init_database
 from routers import debates, moderator, policy_papers
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,3 +38,5 @@ app.include_router(policy_papers.router)
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now()}
+
+# Add other endpoints and configurations as needed

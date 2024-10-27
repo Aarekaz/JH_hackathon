@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
 from typing import List
-from models.schemas import DebateCreate, DebateResponse, MPResponse, Vote
-from repositories.debate_repository import DebateRepository
+
 from db.database import get_db
 from dependencies import get_openai_service
+from fastapi import APIRouter, Depends, HTTPException
+from models.database_models import PolicyPaper
+from models.schemas import DebateCreate, DebateResponse, MPResponse, Vote
+from repositories.debate_repository import DebateRepository
 from services.openai_service import OpenAIService
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/debates", tags=["debates"])
 
@@ -153,3 +155,83 @@ async def get_vote_summary(
         summary["result"] = "tied"
     
     return summary
+
+@router.post("/{paper_id}/start-full-debate")
+async def start_full_debate(
+    paper_id: int,
+    db: Session = Depends(get_db),
+    openai_service: OpenAIService = Depends(get_openai_service)
+):
+    """Start a debate and generate all MP responses and votes."""
+    try:
+        # Get the paper and create debate
+        paper = db.query(PolicyPaper).filter(PolicyPaper.id == paper_id).first()
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
+        
+        # Create the debate
+        debate_data = await openai_service.create_debate_from_paper(paper)
+        debate = await DebateRepository.create_debate_from_paper(db, paper, debate_data)
+        
+        # Generate responses for all MP roles
+        mp_roles = ["corporate", "academic", "government", "civil_rights"]
+        db_responses = []  # Store actual MPResponse objects
+        response_dicts = []  # Store dictionary representations
+        
+        for role in mp_roles:
+            content = await openai_service.generate_mp_response(
+                role,
+                debate.title,
+                db_responses  # Pass the list of MPResponse objects
+            )
+            
+            db_response = await DebateRepository.add_response(
+                db,
+                debate.id,
+                role,
+                content
+            )
+            db_responses.append(db_response)
+            
+            # Convert to dict for API response
+            response_dicts.append({
+                "id": db_response.id,
+                "debate_id": db_response.debate_id,
+                "mp_role": db_response.mp_role,
+                "content": db_response.content,
+                "timestamp": db_response.timestamp
+            })
+        
+        # Generate votes using the actual responses
+        votes = []
+        for role in mp_roles:
+            vote_decision = await openai_service.generate_vote_decision(
+                role,
+                debate.title,
+                db_responses  # Pass the actual MPResponse objects
+            )
+            vote = await DebateRepository.create_vote(
+                db,
+                debate.id,
+                role,
+                vote_decision["vote"],
+                vote_decision["reasoning"]
+            )
+            votes.append(vote)
+        
+        # Get vote summary
+        summary = await get_vote_summary(debate.id, db)
+        
+        return {
+            "debate_id": debate.id,
+            "title": debate.title,
+            "responses": response_dicts,
+            "votes": votes,
+            "summary": summary
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error in debate process: {str(e)}"
+        )

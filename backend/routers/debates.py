@@ -1,13 +1,15 @@
-from typing import List
+from typing import Any, Dict, List
 
 from db.database import get_db
-from dependencies import get_openai_service
+from dependencies import get_openai_service, get_vote_monitor
 from fastapi import APIRouter, Depends, HTTPException
 from models.database_models import PolicyPaper
-from models.schemas import DebateCreate, DebateResponse, MPResponse, Vote
+from models.schemas import DebateCreate, DebateResponse, MPResponse, Vote, VoteResponse
+from monitoring.vote_metrics import VoteConsistencyMonitor
 from repositories.debate_repository import DebateRepository
 from services.openai_service import OpenAIService
 from sqlalchemy.orm import Session
+import logging
 
 router = APIRouter(prefix="/debates", tags=["debates"])
 
@@ -77,7 +79,8 @@ async def cast_vote(
     debate_id: int,
     mp_role: str,
     db: Session = Depends(get_db),
-    openai_service: OpenAIService = Depends(get_openai_service)
+    openai_service: OpenAIService = Depends(get_openai_service),
+    vote_monitor: VoteConsistencyMonitor = Depends(get_vote_monitor)
 ):
     """Cast a vote for a specific MP role."""
     try:
@@ -87,6 +90,7 @@ async def cast_vote(
             raise HTTPException(status_code=404, detail="Debate not found")
             
         debate_history = await DebateRepository.get_debate_responses(db, debate_id)
+        mp_response = next((r for r in debate_history if r.mp_role == mp_role), None)
         
         # Generate vote decision
         vote_decision = await openai_service.generate_vote_decision(
@@ -94,6 +98,17 @@ async def cast_vote(
             debate.title,
             debate_history
         )
+        
+        # Monitor vote consistency if we have an MP response
+        consistency_score = None
+        if mp_response:
+            consistency_score = await vote_monitor.record_metric(
+                debate_id,
+                mp_role,
+                mp_response.content,
+                vote_decision,
+                openai_service.vote_service
+            )
         
         # Store vote in database
         db_vote = await DebateRepository.create_vote(
@@ -110,7 +125,8 @@ async def cast_vote(
             "reasoning": db_vote.reasoning,
             "mp_role": db_vote.mp_role,
             "debate_id": db_vote.debate_id,
-            "timestamp": db_vote.timestamp
+            "timestamp": db_vote.timestamp,
+            "consistency_score": consistency_score
         }
         
     except Exception as e:
@@ -131,11 +147,20 @@ async def get_votes(
 async def get_vote_summary(
     debate_id: int,
     db: Session = Depends(get_db)
-):
-    """Get a summary of the voting results."""
+) -> Dict[str, Any]:
+    """
+    Get a summary of the voting results.
+    
+    Args:
+        debate_id: The ID of the debate
+        db: Database session
+        
+    Returns:
+        Dict containing vote counts and final result
+    """
     votes = await DebateRepository.get_debate_votes(db, debate_id)
     
-    summary = {
+    summary: Dict[str, Any] = {
         "for": 0,
         "against": 0,
         "abstain": 0,
@@ -146,13 +171,22 @@ async def get_vote_summary(
     for vote in votes:
         summary[vote.vote] += 1
     
-    # Determine result
-    if summary["for"] > summary["against"]:
-        summary["result"] = "passed"
-    elif summary["for"] < summary["against"]:
-        summary["result"] = "rejected"
+    # Calculate voting result
+    if summary["abstain"] == summary["total"]:
+        summary["result"] = "abstained"
     else:
-        summary["result"] = "tied"
+        # Only consider non-abstaining votes for the result
+        total_votes = summary["for"] + summary["against"]
+        if total_votes > 0:
+            # Calculate if we have a majority
+            if summary["for"] > total_votes / 2:
+                summary["result"] = "passed"
+            elif summary["against"] > total_votes / 2:
+                summary["result"] = "rejected"
+            else:
+                summary["result"] = "tied"
+        else:
+            summary["result"] = "abstained"
     
     return summary
 
@@ -161,81 +195,112 @@ async def start_full_debate(
     paper_id: int,
     db: Session = Depends(get_db),
     openai_service: OpenAIService = Depends(get_openai_service)
-):
-    """Start a debate and generate all MP responses and votes."""
+) -> Dict[str, Any]:
+    """
+    Start a debate and generate all MP responses and votes.
+    
+    Args:
+        paper_id: ID of the policy paper
+        db: Database session
+        openai_service: OpenAI service instance
+        
+    Returns:
+        Dict containing debate details, responses, votes and summary
+        
+    Raises:
+        HTTPException: If paper not found or debate creation fails
+    """
     try:
         # Get the paper and create debate
         paper = db.query(PolicyPaper).filter(PolicyPaper.id == paper_id).first()
         if not paper:
             raise HTTPException(status_code=404, detail="Paper not found")
         
-        # Create the debate
-        debate_data = await openai_service.create_debate_from_paper(paper)
-        debate = await DebateRepository.create_debate_from_paper(db, paper, debate_data)
+        # Create the debate with better error handling
+        try:
+            debate_data = await openai_service.create_debate_from_paper(paper)
+            debate = await DebateRepository.create_debate_from_paper(db, paper, debate_data)
+        except Exception as e:
+            logging.error(f"Failed to create debate: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to create debate")
         
         # Generate responses for all MP roles
         mp_roles = ["corporate", "academic", "government", "civil_rights"]
-        db_responses = []  # Store actual MPResponse objects
-        response_dicts = []  # Store dictionary representations
+        db_responses: List[MPResponse] = []
+        response_dicts: List[Dict[str, Any]] = []
         
         for role in mp_roles:
-            # Get MP color from OpenAI service
-            mp_color = openai_service.mp_roles[role]["color"]
-            
-            content = await openai_service.generate_mp_response(
-                role,
-                debate.title,
-                db_responses  # Pass the list of MPResponse objects
-            )
-            
-            db_response = await DebateRepository.add_response(
-                db,
-                debate.id,
-                role,
-                content,
-                mp_color
-            )
-            db_responses.append(db_response)
-            
-            # Convert to dict for API response
-            response_dicts.append({
-                "id": db_response.id,
-                "debate_id": db_response.debate_id,
-                "mp_role": db_response.mp_role,
-                "content": db_response.content,
-                "color": db_response.color,
-                "timestamp": db_response.timestamp
-            })
+            try:
+                mp_color = openai_service.mp_roles[role]["color"]
+                content = await openai_service.generate_mp_response(
+                    role,
+                    debate.title,
+                    db_responses
+                )
+                
+                db_response = await DebateRepository.add_response(
+                    db,
+                    debate.id,
+                    role,
+                    content,
+                    mp_color
+                )
+                db_responses.append(db_response)
+                
+                response_dicts.append({
+                    "id": db_response.id,
+                    "debate_id": db_response.debate_id,
+                    "mp_role": db_response.mp_role,
+                    "content": db_response.content,
+                    "color": db_response.color,
+                    "timestamp": db_response.timestamp
+                })
+            except Exception as e:
+                logging.error(f"Failed to generate response for {role}: {str(e)}")
+                continue
         
-        # Generate votes using the actual responses
+        # Generate votes with error handling
         votes = []
         for role in mp_roles:
-            vote_decision = await openai_service.generate_vote_decision(
-                role,
-                debate.title,
-                db_responses  # Pass the actual MPResponse objects
-            )
-            vote = await DebateRepository.create_vote(
-                db,
-                debate.id,
-                role,
-                vote_decision["vote"],
-                vote_decision["reasoning"]
-            )
-            votes.append(vote)
+            try:
+                vote_decision = await openai_service.generate_vote_decision(
+                    role,
+                    debate.title,
+                    db_responses
+                )
+                db_vote = await DebateRepository.create_vote(
+                    db,
+                    debate.id,
+                    role,
+                    vote_decision["vote"],
+                    vote_decision["reasoning"]
+                )
+                # Convert DB model to Pydantic model
+                vote_response = VoteResponse.from_orm(db_vote)
+                votes.append(vote_response)
+            except Exception as e:
+                logging.error(f"Failed to generate vote for {role}: {str(e)}")
+                continue
         
         # Get vote summary
-        summary = await get_vote_summary(debate.id, db)
+        try:
+            summary = await get_vote_summary(debate.id, db)
+        except Exception as e:
+            logging.error(f"Failed to generate vote summary: {str(e)}")
+            summary = {"error": "Failed to generate summary"}
         
         return {
             "debate_id": debate.id,
             "title": debate.title,
             "responses": response_dicts,
-            "votes": votes,
+            "votes": [vote.model_dump() for vote in votes],  # Convert to dict
             "summary": summary
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logging.error(f"Error in debate process: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error in debate process: {str(e)}"

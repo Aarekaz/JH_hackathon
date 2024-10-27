@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from models.database_models import MPResponse, PolicyPaper
 from openai import OpenAI
+from services.vote_decision_service import VoteDecisionService
+import logging
 
 
 class OpenAIService:
@@ -39,6 +41,8 @@ class OpenAIService:
                 "color": "#000099"  # Advocacy red
             }
         }
+
+        self.vote_service = VoteDecisionService()
 
     async def generate_mp_response(
         self, 
@@ -126,55 +130,48 @@ Please provide:
     ) -> dict:
         """Generate MP's voting decision based on the debate."""
         try:
-            # Format debate history
-            formatted_history = "\n".join([
-                f"{response.mp_role}: {response.content[:200]}..." 
-                for response in debate_history
-            ])
+            # Calculate vote score using the new service
+            vote_analysis = self.vote_service.calculate_vote_score(role, debate_history)
             
-            prompt = f"""As an AI MP representing {role} interests, analyze this debate and vote:
-Topic: {debate_topic}
-
-Key Points from Debate:
-{formatted_history}
-
-Based on your role's perspective and the debate, provide your vote and reasoning.
-Format your response exactly as shown:
-{{
-    "vote": "for",  // must be exactly "for", "against", or "abstain"
-    "reasoning": "Brief explanation of your vote"
-}}"""
-
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are an AI MP making a voting decision. Respond only with the exact JSON format specified."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=200  # Limit response length
-            )
+            # Use GPT to generate reasoning based on the vote
+            prompt = f"""As an AI MP representing {role} interests, explain this voting decision:
+            Topic: {debate_topic}
+            Vote: {vote_analysis['vote']}
+            Confidence: {vote_analysis['confidence']:.2f}
             
-            # Parse and validate response
-            import json
-            vote_data = json.loads(response.choices[0].message.content)
-            
-            # Validate vote value
-            if vote_data["vote"] not in ["for", "against", "abstain"]:
-                raise ValueError(f"Invalid vote value: {vote_data['vote']}")
-                
-            return vote_data
+            Provide a convincing explanation for this voting decision from your role's perspective.
+            """
 
-        except json.JSONDecodeError as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error parsing vote decision: {str(e)}"
-            )
+            try:
+                response = self.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are an AI MP explaining your voting decision."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=200
+                )
+                reasoning = response.choices[0].message.content
+            except Exception as e:
+                logging.error(f"OpenAI API error for {role}: {str(e)}")
+                # Provide a fallback reasoning if OpenAI fails
+                reasoning = f"As a {role} representative, I have considered the implications and reached this decision."
+            
+            return {
+                "vote": vote_analysis['vote'],
+                "reasoning": reasoning,
+                "confidence": vote_analysis['confidence']
+            }
+            
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error generating vote decision: {str(e)}"
-            )
+            logging.error(f"Vote generation error for {role}: {str(e)}")
+            # Return a default vote instead of raising an exception
+            return {
+                "vote": "abstain",
+                "reasoning": f"Due to technical difficulties, as a {role} representative, I must abstain from voting.",
+                "confidence": 0.0
+            }
 
     async def create_debate_from_paper(self, paper: PolicyPaper) -> dict:
         """Create a structured debate from a policy paper."""
@@ -215,3 +212,46 @@ Create a debate topic that MPs can discuss regarding AI policy implications."""
                 "background": paper.summary,
                 "key_considerations": ["Safety", "Ethics", "Implementation"]
             }
+
+    async def validate_vote_consistency(
+        self,
+        role: str,
+        response_content: str,
+        vote_decision: Dict[str, Any]
+    ) -> bool:
+        """
+        Validate that the voting decision is consistent with the MP's debate response.
+        
+        Args:
+            role: The MP role
+            response_content: The MP's debate response
+            vote_decision: The generated vote decision
+        
+        Returns:
+            bool: True if consistent, False otherwise
+        """
+        try:
+            prompt = f"""Analyze if this MP's voting decision is consistent with their debate response:
+            
+            Role: {role}
+            Debate Response: {response_content}
+            Vote: {vote_decision['vote']}
+            Reasoning: {vote_decision['reasoning']}
+            
+            Is this vote consistent with the position expressed in the debate? Answer only YES or NO."""
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are analyzing voting consistency."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=50
+            )
+            
+            return "YES" in response.choices[0].message.content.upper()
+            
+        except Exception as e:
+            logging.warning(f"Consistency check failed: {str(e)}")
+            return True  # Default to accepting the vote if check fails

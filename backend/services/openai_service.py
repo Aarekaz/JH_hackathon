@@ -68,7 +68,7 @@ Please provide your response to the current debate, considering your role's pers
 
             # The OpenAI client is not async, so we don't use await here
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an AI MP in a parliamentary debate."},
                     {"role": "user", "content": prompt}
@@ -89,7 +89,7 @@ Please provide your response to the current debate, considering your role's pers
         """Evaluate a proposed policy from multiple perspectives."""
         try:
             response = await self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an AI policy analyst."},
                     {"role": "user", "content": f"""Analyze this AI policy proposal from multiple perspectives:
@@ -146,7 +146,7 @@ Format your response exactly as shown:
 }}"""
 
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are an AI MP making a voting decision. Respond only with the exact JSON format specified."},
                     {"role": "user", "content": prompt}
@@ -186,7 +186,7 @@ Summary: {paper.summary}
 Create a debate topic that MPs can discuss regarding AI policy implications."""
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "You are a parliamentary debate moderator."},
                     {"role": "user", "content": prompt}

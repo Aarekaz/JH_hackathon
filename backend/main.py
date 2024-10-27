@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db.init_db import init_database
-from routers import debates, moderator, policy_papers
+from routers import debates, moderator, policy_papers, monitoring
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,7 +23,7 @@ init_database()
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(debates.router)
 app.include_router(moderator.router)
 app.include_router(policy_papers.router)
+app.include_router(monitoring.router)
 
 @app.get("/health")
 async def health_check():

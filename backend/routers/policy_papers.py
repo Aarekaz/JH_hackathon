@@ -83,3 +83,25 @@ async def start_debate(
         "debate_topic": debate.title,
         "status": debate.status
     }
+
+@router.get("/{paper_id}", response_model=dict)
+async def get_paper_details(
+    paper_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get details of a specific policy paper."""
+    try:
+        paper = db.query(PolicyPaper).filter(PolicyPaper.id == paper_id).first()
+        if not paper:
+            raise HTTPException(status_code=404, detail="Paper not found")
+        return {
+            "id": paper.id,
+            "title": paper.title,
+            "content": paper.content,
+            "summary": paper.summary,
+            "source": paper.source,
+            "url": paper.url,
+            "status": paper.status
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

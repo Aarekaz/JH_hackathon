@@ -182,7 +182,7 @@ Summary: {paper.summary}
 Create a debate topic that MPs can discuss regarding AI policy implications."""
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are a parliamentary debate moderator."},
                     {"role": "user", "content": prompt}

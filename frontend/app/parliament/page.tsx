@@ -10,9 +10,6 @@ const ParliamentPage: React.FC = () => {
   const [paperInfo, setPaperInfo] = useState<any>(
     JSON.parse(localStorage.getItem("paper_info") || "{}")
   );
-  const [summary, setSummary] = useState<any>(
-    JSON.parse(localStorage.getItem("summary") || "{}")
-  );
 
   // if you get paperid, fetch paper info from this url /papers/{paper_id} using axios
   useEffect(() => {
@@ -24,10 +21,6 @@ const ParliamentPage: React.FC = () => {
     }
   }, [paperid]);
 
-  const handleVote = (newSummary) => {
-    setSummary(newSummary);
-  };
-
   return (
     <div className="flex w-full h-screen">
       <div className="w-9/12 h-full">
@@ -37,10 +30,10 @@ const ParliamentPage: React.FC = () => {
             <p>{paperInfo.summary}</p>
           </div>
         )}
-        <LeftChart summary={summary} />
+        <LeftChart />
       </div>
       <div className="w-3/12 h-full">
-        <RightChat onVote={handleVote} />
+        <RightChat />
       </div>
     </div>
   );

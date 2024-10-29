@@ -7,23 +7,28 @@ import {
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import axios from "axios";
+import { TrophySpin } from "react-loading-indicators";
 
-const RightChat = ({ onVote }) => {
+const RightChat = () => {
   const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
   const paper_id = localStorage.getItem("paperid");
 
   useEffect(() => {
     const fetchMessages = async () => {
-      try {
-        const response = await axios.post(
-          `http://localhost:8000/debates/${paper_id}/start-full-debate`
-        );
-        setMessages(response.data.responses);
-        const summary = response.data.summary;
-        localStorage.setItem("summary", JSON.stringify(summary));
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
+      await axios
+        .post(`http://localhost:8000/debates/${paper_id}/start-full-debate`)
+        .then((response) => {
+          console.log(response.data);
+          setMessages(response.data.responses);
+          const summary = response.data.summary;
+          localStorage.setItem("summary", JSON.stringify(summary));
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching messages:", error);
+          setLoading(false); // Set loading to false even if there's an error
+        });
     };
 
     fetchMessages();
@@ -45,9 +50,12 @@ const RightChat = ({ onVote }) => {
   };
 
   const handleVoteClick = () => {
-    const summary = JSON.parse(localStorage.getItem("summary") || "{}");
-    onVote(summary);
+    console.log("Voting...");
   };
+
+  if (loading) {
+    return <TrophySpin color="#32cd32" size="medium" text="" textColor="" />;
+  }
 
   return (
     <div className="flex flex-col h-full p-4 border-l border-gray-300 bg-gray-400">

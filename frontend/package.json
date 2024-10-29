@@ -17,6 +17,7 @@
     "primereact": "^10.8.4",
     "react": "19.0.0-rc-69d4b800-20241021",
     "react-dom": "19.0.0-rc-69d4b800-20241021",
+    "react-loading-indicators": "^1.0.0",
     "react-router-dom": "^6.27.0",
     "react-uploader": "^3.43.0"
   },

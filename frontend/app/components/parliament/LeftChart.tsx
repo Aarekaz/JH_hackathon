@@ -5,12 +5,14 @@ import HighchartsItem from "highcharts/modules/item-series";
 // Initialize the item module
 HighchartsItem(Highcharts);
 
-const LeftChart = ({ summary }) => {
+const LeftChart = () => {
   // const debate_id = localStorage.getItem("debate_id");
-  const [votesFor, setVotesFor] = useState(summary?.for || 0);
-  const [votesAgainst, setVotesAgainst] = useState(summary?.against || 0);
-  const [votesAbstain, setVotesAbstain] = useState(summary?.abstain || 0);
-  const [votesResult, setVotesResult] = useState(summary?.result || "");
+  const summary = JSON.parse(localStorage.getItem("summary") || "{}");
+
+  const [votesFor, setVotesFor] = useState(summary.for || 0);
+  const [votesAgainst, setVotesAgainst] = useState(summary.against || 0);
+  const [votesAbstain, setVotesAbstain] = useState(summary.abstain || 0);
+  const [votesResult, setVotesResult] = useState(summary.result || "");
 
   useEffect(() => {
     Highcharts.chart("container", {
@@ -90,19 +92,6 @@ const LeftChart = ({ summary }) => {
       },
     });
   }, []);
-  // useEffect(() => {
-  //   if (debate_id) {
-  //     axios
-  //       .get(`http://localhost:8000/debates/${debate_id}/vote-summary`)
-  //       .then((response) => {
-  //         console.log(response.data);
-  //         setVotesFor(response.data.for);
-  //         setVotesAgainst(response.data.against);
-  //         setVotesAbstain(response.data.abstain);
-  //         setVotesResult(response.data.result);
-  //       });
-  //   }
-  // }, [debate_id]);
 
   return (
     <div className="h-full flex flex-col items-center justify-center">

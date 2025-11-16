@@ -14,11 +14,11 @@ class Debate(Base):
     title = Column(Text, nullable=False)
     description = Column(Text, nullable=False)
     policy_text = Column(Text)
-    status = Column(String(20), default='active')
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
+    status = Column(String(20), default='active', index=True)  # Index for filtering by status
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)  # Index for sorting by date
+
     # Foreign key to PolicyPaper
-    paper_id = Column(Integer, ForeignKey('policy_papers.id'))
+    paper_id = Column(Integer, ForeignKey('policy_papers.id'), index=True)  # Index for joins
     # Relationship with PolicyPaper
     paper = relationship("PolicyPaper", back_populates="debate")
     # Relationship with responses
@@ -30,26 +30,26 @@ class MPResponse(Base):
     __tablename__ = "mp_responses"
 
     id = Column(Integer, primary_key=True, index=True)
-    debate_id = Column(Integer, ForeignKey("debates.id"))
-    mp_role = Column(String)
+    debate_id = Column(Integer, ForeignKey("debates.id"), index=True)  # Index for joins
+    mp_role = Column(String, index=True)  # Index for filtering by role
     content = Column(Text)
     color = Column(String, default="#000000")
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)  # Index for sorting
+
     # Relationship
     debate = relationship("Debate", back_populates="responses")
 
 class Vote(Base):
     """Database model for votes."""
     __tablename__ = "votes"
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    debate_id = Column(Integer, ForeignKey("debates.id"))
-    mp_role = Column(String)
-    vote = Column(String)  # 'for', 'against', 'abstain'
+    debate_id = Column(Integer, ForeignKey("debates.id"), index=True)  # Index for joins
+    mp_role = Column(String, index=True)  # Index for filtering by role
+    vote = Column(String, index=True)  # Index for vote aggregation queries
     reasoning = Column(Text)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Index for sorting
+
     # Relationship
     debate = relationship("Debate", back_populates="votes")
 
@@ -61,10 +61,10 @@ class PolicyPaper(Base):
     title = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     summary = Column(Text, nullable=False)
-    source = Column(String(50), default='arxiv')
+    source = Column(String(50), default='arxiv', index=True)  # Index for filtering by source
     url = Column(Text)
-    status = Column(String(20), default='pending')
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
+    status = Column(String(20), default='pending', index=True)  # Index for filtering by status
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)  # Index for sorting
+
     # Relationship with Debate
     debate = relationship("Debate", back_populates="paper", uselist=False)

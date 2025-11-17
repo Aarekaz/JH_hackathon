@@ -4,10 +4,16 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const LandingPage: React.FC = () => {
-  const [papers, setPapers] = useState<any[]>(
-    JSON.parse(localStorage.getItem("papers") || "[]")
-  );
+  const [papers, setPapers] = useState<any[]>([]);
   const navigate = useNavigate();
+
+  // Load cached papers from localStorage on mount (client-side only)
+  useEffect(() => {
+    const cachedPapers = localStorage.getItem("papers");
+    if (cachedPapers) {
+      setPapers(JSON.parse(cachedPapers));
+    }
+  }, []);
 
   // Function to fetch papers from the backend
   const getArxivPapers = async () => {

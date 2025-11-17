@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import asyncio
 
 from db.database import get_db
 from dependencies import get_openai_service, get_vote_monitor
@@ -224,20 +225,37 @@ async def start_full_debate(
             logging.error(f"Failed to create debate: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to create debate")
         
-        # Generate responses for all MP roles
+        # Generate responses for all MP roles IN PARALLEL (4x speed boost!)
         mp_roles = ["corporate", "academic", "government", "civil_rights"]
         db_responses: List[MPResponse] = []
         response_dicts: List[Dict[str, Any]] = []
-        
-        for role in mp_roles:
+
+        # Parallelize response generation
+        async def generate_single_response(role: str):
             try:
                 mp_color = openai_service.mp_roles[role]["color"]
                 content = await openai_service.generate_mp_response(
                     role,
                     debate.title,
-                    db_responses
+                    []  # Empty history for parallel generation
                 )
-                
+                return role, content, mp_color, None
+            except Exception as e:
+                logging.error(f"Failed to generate response for {role}: {str(e)}")
+                return role, None, None, str(e)
+
+        # Generate all responses in parallel
+        response_results = await asyncio.gather(
+            *[generate_single_response(role) for role in mp_roles],
+            return_exceptions=True
+        )
+
+        # Save all responses to database
+        for role, content, mp_color, error in response_results:
+            if error or content is None:
+                continue
+
+            try:
                 db_response = await DebateRepository.add_response(
                     db,
                     debate.id,
@@ -246,7 +264,7 @@ async def start_full_debate(
                     mp_color
                 )
                 db_responses.append(db_response)
-                
+
                 response_dicts.append({
                     "id": db_response.id,
                     "debate_id": db_response.debate_id,
@@ -256,18 +274,35 @@ async def start_full_debate(
                     "timestamp": db_response.timestamp
                 })
             except Exception as e:
-                logging.error(f"Failed to generate response for {role}: {str(e)}")
+                logging.error(f"Failed to save response for {role}: {str(e)}")
                 continue
         
-        # Generate votes with error handling
-        votes = []
-        for role in mp_roles:
+        # Generate votes IN PARALLEL (another 4x speed boost!)
+        async def generate_single_vote(role: str):
             try:
                 vote_decision = await openai_service.generate_vote_decision(
                     role,
                     debate.title,
                     db_responses
                 )
+                return role, vote_decision, None
+            except Exception as e:
+                logging.error(f"Failed to generate vote for {role}: {str(e)}")
+                return role, None, str(e)
+
+        # Generate all votes in parallel
+        vote_results = await asyncio.gather(
+            *[generate_single_vote(role) for role in mp_roles],
+            return_exceptions=True
+        )
+
+        # Save all votes to database
+        votes = []
+        for role, vote_decision, error in vote_results:
+            if error or vote_decision is None:
+                continue
+
+            try:
                 db_vote = await DebateRepository.create_vote(
                     db,
                     debate.id,
@@ -279,7 +314,7 @@ async def start_full_debate(
                 vote_response = VoteResponse.from_orm(db_vote)
                 votes.append(vote_response)
             except Exception as e:
-                logging.error(f"Failed to generate vote for {role}: {str(e)}")
+                logging.error(f"Failed to save vote for {role}: {str(e)}")
                 continue
         
         # Get vote summary

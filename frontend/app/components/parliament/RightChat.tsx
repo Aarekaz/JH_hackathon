@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -12,10 +14,11 @@ import { TrophySpin } from "react-loading-indicators";
 const RightChat = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const paper_id = localStorage.getItem("paperid");
 
   useEffect(() => {
     const fetchMessages = async () => {
+      // Access localStorage only in useEffect (client-side only)
+      const paper_id = localStorage.getItem("paperid");
       await axios
         .post(`http://localhost:8000/debates/${paper_id}/start-full-debate`)
         .then((response) => {

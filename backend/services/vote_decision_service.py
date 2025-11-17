@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from models.database_models import MPResponse
+from services.sentiment_service import get_sentiment_analyzer
 
 
 class VoteDecisionService:
@@ -10,6 +11,13 @@ class VoteDecisionService:
     
     def __init__(self):
         """Initialize the VoteDecisionService with aligned weights and role definitions."""
+        # Initialize advanced sentiment analyzer
+        try:
+            self.sentiment_analyzer = get_sentiment_analyzer()
+        except Exception as e:
+            logging.warning(f"Failed to load sentiment analyzer, using fallback: {e}")
+            self.sentiment_analyzer = None
+
         self.role_definitions = {
             "corporate": {
                 "description": "Represents business and industry interests",
@@ -81,22 +89,46 @@ class VoteDecisionService:
         }
 
     def analyze_response_sentiment(self, content: str) -> Dict[str, float]:
-        """Analyze response content for different aspects and their sentiment."""
+        """
+        Analyze response content for different aspects and their sentiment.
+        Uses advanced transformer-based sentiment analysis if available.
+        """
+        if self.sentiment_analyzer:
+            # Use advanced sentiment analysis
+            try:
+                aspect_sentiments = self.sentiment_analyzer.analyze_aspects(
+                    content,
+                    list(self.aspect_keywords.keys())
+                )
+
+                # Convert to scores (positive - negative)
+                aspects_score = {}
+                for aspect, sentiment in aspect_sentiments.items():
+                    score = sentiment.get('positive', 0) - sentiment.get('negative', 0)
+                    # Normalize to 0-1 range
+                    aspects_score[aspect] = (score + 1) / 2
+
+                return aspects_score
+
+            except Exception as e:
+                logging.warning(f"Advanced sentiment analysis failed, using fallback: {e}")
+                # Fall through to simple method
+
+        # Fallback: Simple keyword-based scoring
         aspects_score = {}
-        
-        # Simple keyword-based scoring
+
         for aspect, keywords in self.aspect_keywords.items():
             score = 0
             word_count = len(content.split())
-            
+
             for keyword in keywords:
                 if keyword in content.lower():
                     # Count occurrences and normalize
                     occurrences = content.lower().count(keyword)
                     score += occurrences / word_count
-            
+
             aspects_score[aspect] = score
-        
+
         return aspects_score
 
     def calculate_vote_score(

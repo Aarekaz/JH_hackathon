@@ -6,6 +6,40 @@ This document details all the improvements made to transform the AI Parliament S
 
 ---
 
+## 🐛 Critical Bug Fixes (v2.0.1)
+
+### **Bug Fix 1: Sentiment Analyzer Label Mapping**
+
+**Problem:** The HuggingFace transformer model (`cardiffnlp/twitter-roberta-base-sentiment-latest`) returns labels as `LABEL_0`, `LABEL_1`, `LABEL_2`, but the code was trying to assign these directly to the sentiment dictionary, leaving `positive`, `negative`, and `neutral` keys at zero. This caused all sentiment scores to default to 0.5 (neutral), completely breaking the "10x better vote accuracy" feature.
+
+**Solution:** Added proper label mapping in `backend/services/sentiment_service.py:84-106`:
+- `LABEL_0` → `negative`
+- `LABEL_1` → `neutral`
+- `LABEL_2` → `positive`
+
+**Impact:** Now the transformer-based sentiment analysis actually works correctly! Vote accuracy is properly improved.
+
+---
+
+### **Bug Fix 2: CORS Configuration Parsing**
+
+**Problem:** The `Settings` class defined `cors_origins` as a `list` type, which Pydantic expects as JSON array format. However, `.env.example` showed comma-separated strings (`http://localhost:3000,http://localhost:3001`), which is not valid JSON. This caused the app to fail to start with "value is not a valid list" error.
+
+**Solution:** Added `field_validator` in `backend/config.py:32-39` to parse comma-separated strings:
+```python
+@field_validator('cors_origins', mode='before')
+@classmethod
+def parse_cors_origins(cls, v):
+    """Parse CORS origins from comma-separated string or list."""
+    if isinstance(v, str):
+        return [origin.strip() for origin in v.split(',') if origin.strip()]
+    return v
+```
+
+**Impact:** Users can now use the friendly comma-separated format in `.env` as documented in `.env.example`. The app starts successfully.
+
+---
+
 ## ✅ Completed Improvements
 
 ### 1. **Parallel Processing (4x Speed Boost!)**

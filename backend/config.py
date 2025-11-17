@@ -3,8 +3,9 @@ Configuration management for AI Parliament application.
 Uses pydantic-settings for environment variable management.
 """
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union, List
 
 
 class Settings(BaseSettings):
@@ -26,7 +27,16 @@ class Settings(BaseSettings):
 
     # Server Configuration
     debug: bool = False
-    cors_origins: list = ["http://localhost:3000", "http://localhost:3001"]
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:3001"
+
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(v, str):
+            # Split by comma and strip whitespace
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
 
     # API Configuration
     rate_limit_per_minute: int = 10

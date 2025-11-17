@@ -75,8 +75,24 @@ class SentimentAnalyzer:
             # Get sentiment prediction
             result = self._classifier(text[:512])[0]  # Truncate to max length
 
-            label = result['label'].lower()
+            label = result['label']
             score = result['score']
+
+            # Map Cardiff NLP model labels to sentiment categories
+            # cardiffnlp/twitter-roberta-base-sentiment-latest uses:
+            # LABEL_0 = negative, LABEL_1 = neutral, LABEL_2 = positive
+            label_mapping = {
+                'LABEL_0': 'negative',
+                'label_0': 'negative',
+                'LABEL_1': 'neutral',
+                'label_1': 'neutral',
+                'LABEL_2': 'positive',
+                'label_2': 'positive',
+                # Fallback for other models that might use direct labels
+                'negative': 'negative',
+                'neutral': 'neutral',
+                'positive': 'positive'
+            }
 
             # Convert to standard format
             sentiment_scores = {
@@ -85,7 +101,9 @@ class SentimentAnalyzer:
                 'neutral': 0.0
             }
 
-            sentiment_scores[label] = score
+            # Map the label and assign score
+            mapped_label = label_mapping.get(label, 'neutral')
+            sentiment_scores[mapped_label] = score
 
             return sentiment_scores
 
